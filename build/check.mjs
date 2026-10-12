@@ -490,7 +490,10 @@ for (const file of htmlFiles) {
   }
   // Only the state pages and the home page may carry these blocks.
   for (const file of htmlFiles) {
-    const rel = file.replace(dist, '');
+    // Normalize separators so the allow-list matches on Windows too
+    // (path.join yields "\state\alabama\index.html", which would never
+    // equal "/index.html" and falsely flagged every legitimate carrier).
+    const rel = file.replace(dist, '').split('\\').join('/');
     if (rel === '/index.html' || rel.startsWith('/state/')) continue;
     if (/data-block="epidemic-trend/.test(readFileSync(file, 'utf8'))) errors.push(`${rel}: carries an epidemic-trend block it should not`);
   }
