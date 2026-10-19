@@ -8,11 +8,23 @@ import { states } from '../src/scripts/states-data.js';
 import { stateChip } from '../src/scripts/render.js';
 import { site } from '../build/lib/site.mjs';
 
+/** Most recent Saturday on or before today, then n weeks further back.
+ * Keeps fixtures inside the live pipeline's 21-day observation window
+ * forever — the frozen 2026-09-26 anchor aged out on 2026-10-18 and
+ * broke CI (assembleLiveSignals drops weeks older than the window). */
+function saturdayWeeksBack(n) {
+  const d = new Date();
+  d.setUTCHours(12, 0, 0, 0);
+  const dow = d.getUTCDay(); // 6 = Saturday
+  d.setUTCDate(d.getUTCDate() - ((dow + 1) % 7) - n * 7);
+  return d.toISOString().slice(0, 10);
+}
+
 // Signal bundles shaped like the live adapter's output, with the real CDC
 // values for the week ending 2026-09-26 (NSSP ED %, NWSS site medians, ARI).
 const MD = {
   provenance: { kind: 'live', now: '2026-10-09T12:00:00Z' },
-  ariLevel: 0, ariLabel: 'Very Low', positivityCombined: null, weekEnding: '2026-09-26',
+  ariLevel: 0, ariLabel: 'Very Low', positivityCombined: null, weekEnding: saturdayWeeksBack(2),
   edCombinedSeries: [0.1, 0.1, 0.1, 0.1, 0.2, 0.3, 0.2, 0.3, 0.4, 0.5, 0.6, 0.6],
   wastewaterSeries: [],
   pathogens: {
@@ -124,7 +136,7 @@ test('possessives follow the state name (Texas’, not Texas’s)', () => {
 });
 
 test('the rendered block escapes text and carries the week', () => {
-  const html = takeawaysBlock({ name: 'A<b>' }, computeModel(MD), MD, { live: true, weekEnding: '2026-09-26' });
+  const html = takeawaysBlock({ name: 'A<b>' }, computeModel(MD), MD, { live: true, weekEnding: saturdayWeeksBack(2) });
   assert.ok(!html.includes('A<b>'), 'state name escaped');
   assert.match(html, /Week ending Sep 26, 2026/);
   assert.equal((html.match(/<li>/g) || []).length, 4, 'no peers → no region line');
@@ -134,7 +146,7 @@ test('the rendered block escapes text and carries the week', () => {
 
 function ctxFor(signalsByAbbr, live) {
   const models = new Map(states.map((st) => [st.abbr, { model: computeModel(signalsByAbbr[st.abbr]), signals: signalsByAbbr[st.abbr] }]));
-  return { site, weekEnding: '2026-09-26', provenance: { live }, states, models, render: { stateChip } };
+  return { site, weekEnding: saturdayWeeksBack(2), provenance: { live }, states, models, render: { stateChip } };
 }
 
 test('state report: block present on live data, absent (empty region) on sample', () => {
@@ -157,7 +169,7 @@ test('explicit sample or stale provenance suppresses health takeaways even under
 });
 
 test('insufficient history and a missing pathogen never become steady or reassuring', () => {
-  const signals = { ariLevel: 0, provenance: MD.provenance, weekEnding: '2026-09-26', edCombinedSeries: [0.3], pathogens: { covid: { edPercentSeries: [0.3] } } };
+  const signals = { ariLevel: 0, provenance: MD.provenance, weekEnding: saturdayWeeksBack(2), edCombinedSeries: [0.3], pathogens: { covid: { edPercentSeries: [0.3] } } };
   const all = texts(weeklyTakeaways(find('MD'), computeModel(signals), signals, { live: true }));
   assert.match(all, /not enough history to determine a trend/);
   assert.match(all, /No usable influenza reading was available/);
