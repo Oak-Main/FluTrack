@@ -72,7 +72,19 @@ function weeksEnding(last, n) {
   }
   return out;
 }
-const WEEKS = weeksEnding('2026-09-26', 14);
+/** Most recent Saturday on or before today, then n weeks further back.
+ * Keeps fixtures inside the live pipeline's 21-day observation window
+ * forever — the frozen 2026-09-26 anchor aged out on 2026-10-18 and
+ * broke CI (assembleLiveSignals drops weeks older than the window). */
+function saturdayWeeksBack(n) {
+  const d = new Date();
+  d.setUTCHours(12, 0, 0, 0);
+  const dow = d.getUTCDay(); // 6 = Saturday
+  d.setUTCDate(d.getUTCDate() - ((dow + 1) % 7) - n * 7);
+  return d.toISOString().slice(0, 10);
+}
+const WEEKS = weeksEnding(saturdayWeeksBack(2), 14);
+const LATEST = WEEKS.at(-1);
 
 /** NSSP ED rows: long format, one row per geography × week × pathogen. */
 function edRows(geographies, weeks = WEEKS) {
@@ -90,12 +102,12 @@ function edRows(geographies, weeks = WEEKS) {
 test('parseEdRows pivots the long-format NSSP rows and derives combined = sum of the three', () => {
   const byState = parseEdRows([
     ...edRows(['Maryland']),
-    { week_end: '2026-09-26T00:00:00.000', pathogen: 'Influenza', geography: 'United States', percent_visits: '0.3' },
+    { week_end: `${LATEST}T00:00:00.000`, pathogen: 'Influenza', geography: 'United States', percent_visits: '0.3' },
   ]);
   assert.deepEqual([...byState.keys()], ['MD'], 'national row is not mistaken for a state');
   const md = byState.get('MD');
   assert.equal(md.length, WEEKS.length);
-  assert.equal(md.at(-1).week, '2026-09-26');
+  assert.equal(md.at(-1).week, `${LATEST}`);
   assert.equal(md.at(-1).covid, 0.4);
   assert.equal(md.at(-1).rsv, 0);
   assert.equal(md.at(-1).combined, Math.round((0.4 + md.at(-1).influenza + 0) * 100) / 100);
@@ -104,15 +116,15 @@ test('parseEdRows pivots the long-format NSSP rows and derives combined = sum of
 
 test('parseEdRows leaves combined unset when a pathogen is missing that week', () => {
   const md = parseEdRows([
-    { week_end: '2026-09-26T00:00:00.000', pathogen: 'COVID-19', geography: 'Maryland', percent_visits: '0.4' },
-    { week_end: '2026-09-26T00:00:00.000', pathogen: 'Influenza', geography: 'Maryland', percent_visits: '0.2' },
+    { week_end: `${LATEST}T00:00:00.000`, pathogen: 'COVID-19', geography: 'Maryland', percent_visits: '0.4' },
+    { week_end: `${LATEST}T00:00:00.000`, pathogen: 'Influenza', geography: 'Maryland', percent_visits: '0.2' },
   ]).get('MD');
   assert.ok(Number.isNaN(md[0].combined));
 });
 
 test('parseEdRows still reads the wide percent_visits_<pathogen> shape', () => {
   const md = parseEdRows([
-    { week_end: '2026-09-26', geography: 'MD', percent_visits_combined: '3.1', percent_visits_influenza: '1.0', percent_visits_covid: '1.5', percent_visits_rsv: '0.4' },
+    { week_end: `${LATEST}`, geography: 'MD', percent_visits_combined: '3.1', percent_visits_influenza: '1.0', percent_visits_covid: '1.5', percent_visits_rsv: '0.4' },
   ]).get('MD');
   assert.equal(md[0].combined, 3.1);
   assert.equal(md[0].influenza, 1);
@@ -120,10 +132,10 @@ test('parseEdRows still reads the wide percent_visits_<pathogen> shape', () => {
 
 test('parseAriRows reads the published `label` column, including Extremely High and Data Unavailable', () => {
   const byState = parseAriRows([
-    { week_end: '2026-09-26T00:00:00.000', geography: 'Alabama', label: 'Low', buildnumber: '2026-10-02 16:03:50.980149' },
-    { week_end: '2026-09-26T00:00:00.000', geography: 'Iowa', label: 'Data Unavailable', buildnumber: 'x' },
-    { week_end: '2026-09-26T00:00:00.000', geography: 'Guam', label: 'Data Unavailable', buildnumber: 'x' },
-    { week_end: '2026-09-26T00:00:00.000', geography: 'Texas', label: 'Extremely High', buildnumber: 'x' },
+    { week_end: `${LATEST}T00:00:00.000`, geography: 'Alabama', label: 'Low', buildnumber: '2026-10-02 16:03:50.980149' },
+    { week_end: `${LATEST}T00:00:00.000`, geography: 'Iowa', label: 'Data Unavailable', buildnumber: 'x' },
+    { week_end: `${LATEST}T00:00:00.000`, geography: 'Guam', label: 'Data Unavailable', buildnumber: 'x' },
+    { week_end: `${LATEST}T00:00:00.000`, geography: 'Texas', label: 'Extremely High', buildnumber: 'x' },
   ]);
   assert.equal(byState.get('AL')[0].level, 1);
   assert.equal(byState.get('IA')[0].level, null, 'unavailable is null, never a guessed level');
@@ -133,7 +145,7 @@ test('parseAriRows reads the published `label` column, including Extremely High 
 
 test('parseWastewaterRows takes the median across sites and drops non-commercial networks', () => {
   let n = 0; // every row is a different sampling site, as in the real feed
-  const site = (source, pathogen_target, site_wval, state_territory = 'Maryland', week_end = '2026-09-26') => ({
+  const site = (source, pathogen_target, site_wval, state_territory = 'Maryland', week_end = `${LATEST}`) => ({
     state_territory, counties_served: 'X', site: `ID:${(n += 1)}`, population_served: '1000', source,
     site_wval, site_wval_category: 'Low', date_included_in_wval: '2023-01-01', week_end, pathogen_target, date_updated: '2026-10-02 11:03',
   });
@@ -160,7 +172,7 @@ const wwRow = (state_territory, site, source, pathogen_target, site_wval, week_e
   state_territory, site, source, pathogen_target, site_wval, week_end,
   counties_served: 'X', population_served: '10000', site_wval_category: 'Low', date_included_in_wval: '2023-01-01', date_updated: '2026-10-02 11:03',
 });
-const W4 = ['2026-09-05', '2026-09-12', '2026-09-19', '2026-09-26'];
+const W4 = ['2026-09-05', '2026-09-12', '2026-09-19', `${LATEST}`];
 
 test(`a state reading needs at least ${MIN_WASTEWATER_SITES} eligible sites`, () => {
   const two = W4.map((w, i) => [
@@ -214,11 +226,11 @@ test(`a site repeating one value above the floor for ${STALE_RUN_REPORTS}+ repor
 
 test('assembleLiveSignals keeps the last LIVE_WEEKS weeks and takes the peak pathogen for wastewater', () => {
   const ed = parseEdRows(edRows(['Maryland']));
-  const ari = parseAriRows([{ week_end: '2026-09-26T00:00:00.000', geography: 'Maryland', label: 'Very Low' }]);
-  const ww = new Map([['MD', [{ week: '2026-09-26', influenza: 1.5, covid: 3.2, rsv: NaN }]]]);
+  const ari = parseAriRows([{ week_end: `${LATEST}T00:00:00.000`, geography: 'Maryland', label: 'Very Low' }]);
+  const ww = new Map([['MD', [{ week: `${LATEST}`, influenza: 1.5, covid: 3.2, rsv: NaN }]]]);
   const { signalsByAbbr, weekEnding, statesWithData } = assembleLiveSignals({ ed, ari, ww });
   const md = signalsByAbbr.get('MD');
-  assert.equal(weekEnding, '2026-09-26');
+  assert.equal(weekEnding, `${LATEST}`);
   assert.equal(statesWithData, 1);
   assert.equal(md.edCombinedSeries.length, LIVE_WEEKS);
   assert.equal(md.pathogens.influenza.edPercentSeries.length, LIVE_WEEKS);
@@ -267,7 +279,7 @@ test('fetchLiveSignals requests exactly the pre-warmed ingest queries', async ()
 test('fetchLiveSignals returns live data for all 51 jurisdictions and credits only contributing sources', async () => {
   const { restore } = stubFetch((url) => {
     if (url.includes('vutn-jzwm')) return wrap(edRows(states.map((s) => s.name)));
-    if (url.includes('f3zz-zga5')) return wrap(states.map((s) => ({ week_end: '2026-09-26T00:00:00.000', geography: s.name, label: 'Very Low' })));
+    if (url.includes('f3zz-zga5')) return wrap(states.map((s) => ({ week_end: `${LATEST}T00:00:00.000`, geography: s.name, label: 'Very Low' })));
     return new Error('HTTP 503');
   });
   let live;
@@ -277,7 +289,7 @@ test('fetchLiveSignals returns live data for all 51 jurisdictions and credits on
     restore();
   }
   assert.equal(live.statesWithData, 51);
-  assert.equal(live.weekEnding, '2026-09-26');
+  assert.equal(live.weekEnding, `${LATEST}`);
   assert.deepEqual(live.sources, ['NSSP Emergency Department Visits', 'Acute Respiratory Illness (ARI) Activity Level']);
 });
 
@@ -293,7 +305,7 @@ test(`fetchLiveSignals refuses to call a thin response live (< ${MIN_LIVE_STATES
 
 test('fetchLiveSignals rejects an HTTP-200 response that parses to nothing', async () => {
   // The exact failure the old adapters produced against the real schemas.
-  const { restore } = stubFetch(() => wrap([{ week_end: '2026-09-26', unexpected_column: 'x' }]));
+  const { restore } = stubFetch(() => wrap([{ week_end: `${LATEST}`, unexpected_column: 'x' }]));
   try {
     await assert.rejects(fetchLiveSignals());
   } finally {
@@ -306,7 +318,7 @@ test('fetchLiveSignals rejects an HTTP-200 response that parses to nothing', asy
 
 test('the browser skips the ~20 MB live fetch while the shipped live week is still the newest', () => {
   const now = new Date('2026-10-08T12:00:00Z');
-  assert.equal(shouldRefreshLive({ kind: 'live', weekEnding: '2026-09-26' }, now), false, '12 days: next CDC week not out yet');
+  assert.equal(shouldRefreshLive({ kind: 'live', weekEnding: `${LATEST}` }, now), false, '12 days: next CDC week not out yet');
   assert.equal(shouldRefreshLive({ kind: 'live', weekEnding: '2026-09-25' }, now), true, `>= ${BROWSER_REFRESH_AFTER_DAYS} days: a newer week may exist`);
   assert.equal(shouldRefreshLive({ kind: 'sample', weekEnding: '2026-10-02' }, now), true, 'sample data always tries live');
   assert.equal(shouldRefreshLive({ kind: 'live', weekEnding: '' }, now), true);
@@ -327,7 +339,7 @@ test('a missing latest pathogen never promotes its older observations to the cur
   rows.find((row) => row.week_end.startsWith(W4.at(-1)) && row.pathogen === 'Influenza').percent_visits = '';
   const { signalsByAbbr } = assembleLiveSignals({ ed: parseEdRows(rows), now: new Date('2026-10-08T12:00:00Z') });
   const md = signalsByAbbr.get('MD');
-  assert.equal(md.weekEnding, '2026-09-26');
+  assert.equal(md.weekEnding, `${LATEST}`);
   assert.deepEqual(md.edCombinedSeries, [], 'incomplete latest combined share cannot use the previous week');
   assert.deepEqual(md.pathogens.influenza.edPercentSeries, [], 'latest missing flu cannot use historic flu');
   assert.equal(md.pathogens.influenza.provenance.metrics.edVisits.status, 'missing');
@@ -339,9 +351,9 @@ test('a missing latest pathogen never promotes its older observations to the cur
 test('older metrics remain dated but cannot silently contribute to a newer period', () => {
   const ed = parseEdRows(edRows(['Maryland'], ['2026-09-12', '2026-09-19']));
   const ari = parseAriRows([{ geography: 'Maryland', week_end: '2026-09-12', label: 'Low' }]);
-  const ww = new Map([['MD', [{ week: '2026-09-26', influenza: 1.2, covid: 3.4, rsv: NaN }]]]);
+  const ww = new Map([['MD', [{ week: `${LATEST}`, influenza: 1.2, covid: 3.4, rsv: NaN }]]]);
   const md = assembleLiveSignals({ ed, ari, ww, now: new Date('2026-10-08T12:00:00Z') }).signalsByAbbr.get('MD');
-  assert.equal(md.weekEnding, '2026-09-26');
+  assert.equal(md.weekEnding, `${LATEST}`);
   assert.deepEqual(md.wastewaterSeries, [3.4]);
   assert.deepEqual(md.edCombinedSeries, []);
   assert.equal(md.ariLevel, null);
@@ -352,13 +364,13 @@ test('older metrics remain dated but cannot silently contribute to a newer perio
 });
 
 test('publication, upstream update, ingest retrieval, and observation dates stay distinct', () => {
-  const ed = parseEdRows(edRows(['Maryland'], ['2026-09-26']).map((row) => ({ ...row, publication_date: '2026-10-02', date_updated: '2026-10-03T10:00:00Z' })));
-  const ari = parseAriRows([{ geography: 'Maryland', week_end: '2026-09-26', label: 'Low', buildnumber: '2026-10-02 16:03:50.980149' }]);
+  const ed = parseEdRows(edRows(['Maryland'], [`${LATEST}`]).map((row) => ({ ...row, publication_date: '2026-10-02', date_updated: '2026-10-03T10:00:00Z' })));
+  const ari = parseAriRows([{ geography: 'Maryland', week_end: `${LATEST}`, label: 'Low', buildnumber: '2026-10-02 16:03:50.980149' }]);
   const md = assembleLiveSignals({ ed, ari, now: new Date('2026-10-09T12:00:00Z'), sourceMetadata: {
     edVisits: { retrievedAt: '2026-10-09T00:11:22.744Z', requestRetrievedAt: '2026-10-09T12:00:00Z', stale: true },
   } }).signalsByAbbr.get('MD');
   const metric = md.provenance.metrics.edVisits;
-  assert.equal(metric.observationPeriod.weekEnding, '2026-09-26');
+  assert.equal(metric.observationPeriod.weekEnding, `${LATEST}`);
   assert.equal(metric.publicationDate, '2026-10-02');
   assert.equal(metric.upstreamUpdatedAt, '2026-10-03T10:00:00Z');
   assert.equal(metric.retrievedAt, '2026-10-09T00:11:22.744Z');
@@ -383,12 +395,12 @@ test('a fresh retrieval cannot make old observations usable, and invalid calenda
 });
 
 test('unknown pathogen labels cannot be mistaken for a combined respiratory signal', () => {
-  const md = parseEdRows([{ geography: 'Maryland', week_end: '2026-09-26', pathogen: 'Other illness', percent_visits: '9' }]).get('MD');
+  const md = parseEdRows([{ geography: 'Maryland', week_end: `${LATEST}`, pathogen: 'Other illness', percent_visits: '9' }]).get('MD');
   assert.ok(Number.isNaN(md[0].combined));
 });
 
 test('anonymous wastewater rows cannot establish independent reporting-site coverage', () => {
-  const rows = [1, 2, 3].map((value) => ({ state_territory: 'Maryland', source: 'State_Territory', pathogen_target: 'SARS-CoV-2', site_wval: String(value), week_end: '2026-09-26' }));
+  const rows = [1, 2, 3].map((value) => ({ state_territory: 'Maryland', source: 'State_Territory', pathogen_target: 'SARS-CoV-2', site_wval: String(value), week_end: `${LATEST}` }));
   const md = parseWastewaterRows(rows).get('MD')[0];
   assert.ok(Number.isNaN(md.covid));
   assert.equal(md.coverage.covid.reportingSites, 0);
@@ -397,7 +409,7 @@ test('anonymous wastewater rows cannot establish independent reporting-site cove
 test('only finite contributing sources are credited, while unavailable feeds remain explicit', async () => {
   const { restore } = stubFetch((url) => {
     if (url.includes('vutn-jzwm')) return wrap(edRows(states.map((s) => s.name)));
-    if (url.includes('f3zz-zga5')) return wrap(states.map((s) => ({ geography: s.name, week_end: '2026-09-26', label: 'Data Unavailable' })));
+    if (url.includes('f3zz-zga5')) return wrap(states.map((s) => ({ geography: s.name, week_end: `${LATEST}`, label: 'Data Unavailable' })));
     return new Error('HTTP 503');
   });
   try {
@@ -411,7 +423,7 @@ test('only finite contributing sources are credited, while unavailable feeds rem
 });
 
 test('coverage cannot combine one newest jurisdiction with historic readings in the other 50', async () => {
-  const rows = [...edRows(states.slice(1).map((s) => s.name), ['2026-09-19']), ...edRows([states[0].name], ['2026-09-26'])];
+  const rows = [...edRows(states.slice(1).map((s) => s.name), ['2026-09-19']), ...edRows([states[0].name], [`${LATEST}`])];
   const { restore } = stubFetch((url) => wrap(url.includes('vutn-jzwm') ? rows : []));
   try {
     await assert.rejects(fetchLiveSignals({ now: new Date('2026-10-08T12:00:00Z') }), /only 1 of 51 states/);
