@@ -138,7 +138,10 @@ test('possessives follow the state name (Texas’, not Texas’s)', () => {
 test('the rendered block escapes text and carries the week', () => {
   const html = takeawaysBlock({ name: 'A<b>' }, computeModel(MD), MD, { live: true, weekEnding: saturdayWeeksBack(2) });
   assert.ok(!html.includes('A<b>'), 'state name escaped');
-  assert.match(html, /Week ending Sep 26, 2026/);
+  // Expected human date formatted from the same dynamic anchor the fixture uses.
+  const anchor = new Date(`${saturdayWeeksBack(2)}T00:00:00Z`);
+  const expectedWeek = anchor.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  assert.match(html, new RegExp(`Week ending ${expectedWeek.replaceAll('.', '\\.')}`));
   assert.equal((html.match(/<li>/g) || []).length, 4, 'no peers → no region line');
 });
 
