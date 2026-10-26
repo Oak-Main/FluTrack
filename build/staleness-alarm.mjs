@@ -20,7 +20,7 @@
 // ===========================================================================
 
 import { readFileSync, appendFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { liveAgeDays, MAX_LIVE_AGE_DAYS } from './lib/live-snapshot.mjs';
 import { hasSignalData, MIN_LIVE_STATES } from '../src/scripts/data-sources.js';
 import { states } from '../src/scripts/states-data.js';
@@ -142,6 +142,10 @@ async function main(argv) {
   report(assessProduction(snapshot, { now, maxAgeDays }));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// pathToFileURL, not a string splice: `file://${argv[1]}` never matches on
+// Windows (backslashes, drive letters), where the CLI would then exit 0
+// without ever running. The truthiness guard first: argv[1] is absent for
+// eval/REPL-style imports, and pathToFileURL(undefined) throws.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   await main(process.argv.slice(2));
 }

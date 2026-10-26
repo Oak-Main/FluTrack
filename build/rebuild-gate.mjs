@@ -9,7 +9,7 @@
 // ===========================================================================
 
 import { readFileSync, appendFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 /**
@@ -45,7 +45,11 @@ async function main() {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// pathToFileURL, not a string splice: `file://${argv[1]}` never matches on
+// Windows (backslashes, drive letters), where the gate would then exit 0
+// without comparing anything. The truthiness guard first: argv[1] is absent
+// for eval/REPL-style imports, and pathToFileURL(undefined) throws.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((err) => {
     console.error(err);
     process.exit(1);

@@ -24,3 +24,28 @@ FEATURE_REPORT = "true"
 
 # Secrets (never in this file) — set with `npx wrangler pages secret put <NAME>`:
 #   TURNSTILE_SECRET   Cloudflare Turnstile secret key for the report form
+
+# Production-only configuration (README "Weekly data refresh"). Pages treats
+# vars, d1_databases and kv_namespaces as non-inheritable, so a production
+# override must repeat them all. Pages injects these vars into the production
+# build environment as well as the deployed Functions (the 2026-10-19 build
+# log recorded FEATURE_REPORT=true from build.mjs's process.env, and that var
+# exists only in wrangler.toml). LIVE_PRERENDER=require makes a feed outage
+# fail the production build — Cloudflare keeps serving the last live deploy —
+# instead of silently replacing it with the labeled sample. The build also
+# enforces this on its own for production-branch builds
+# (build/lib/live-snapshot.mjs resolveLivePrerenderMode), so enforcement does
+# not rest on this file alone. Preview inherits the default (auto) so branch
+# previews still build when the feed is down.
+[env.production.vars]
+FEATURE_REPORT = "true"
+LIVE_PRERENDER = "require"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "flutrack-db"
+database_id = "f3349920-cdfd-4513-b5f3-53f25bb25301"
+
+[[env.production.kv_namespaces]]
+binding = "OFFICIAL_CACHE"
+id = "91b560ebf86148e0b8c9cc29b1aa48cc"

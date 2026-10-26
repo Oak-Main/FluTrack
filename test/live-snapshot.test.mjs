@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveSnapshot, liveSnapshot, liveAgeDays, MAX_LIVE_AGE_DAYS } from '../build/lib/live-snapshot.mjs';
+import { resolveSnapshot, resolveLivePrerenderMode, liveSnapshot, liveAgeDays, MAX_LIVE_AGE_DAYS } from '../build/lib/live-snapshot.mjs';
 import { generateSnapshot } from '../build/lib/snapshot.mjs';
 import { shouldDeploy } from '../build/rebuild-gate.mjs';
 import { states } from '../src/scripts/states-data.js';
@@ -147,6 +147,19 @@ test('explicit unknown state bindings cannot satisfy live snapshot coverage desp
 // --- weekly rebuild gate ---------------------------------------------------- //
 
 
+test('production Pages builds always require live data, whatever the variables say', () => {
+  const pagesProduction = { cfPages: '1', cfPagesBranch: 'main' };
+  assert.equal(resolveLivePrerenderMode({ ...pagesProduction }), 'require', 'the production entrypoint defaults to require');
+  assert.equal(resolveLivePrerenderMode({ ...pagesProduction, livePrerender: 'off' }), 'require', 'a stray project variable cannot weaken production to sample');
+  assert.equal(resolveLivePrerenderMode({ ...pagesProduction, livePrerender: 'auto' }), 'require');
+});
+
+test('previews, the workflow preflight and local builds keep their explicit policy', () => {
+  assert.equal(resolveLivePrerenderMode({ livePrerender: 'require' }), 'require', 'the workflow preflight keeps its explicit require');
+  assert.equal(resolveLivePrerenderMode({ cfPages: '1', cfPagesBranch: 'feature-branch', livePrerender: 'off' }), 'off', 'a preview keeps the project variable — the sample fallback survives');
+  assert.equal(resolveLivePrerenderMode({}), 'auto', 'a local build defaults to auto');
+});
+
 test('rebuild gate: deploys a newer CDC week, skips the same week, never deploys sample', () => {
   const built = { kind: 'live', weekEnding: '2026-10-03' };
   assert.equal(shouldDeploy({ built, deployed: { kind: 'live', weekEnding: '2026-09-26' } }).deploy, true);
@@ -155,4 +168,16 @@ test('rebuild gate: deploys a newer CDC week, skips the same week, never deploys
   assert.equal(shouldDeploy({ built, deployed: null }).deploy, true, 'unreadable production → deploy');
   assert.equal(shouldDeploy({ built, deployed: { kind: 'live', weekEnding: '2026-10-03' }, force: true }).deploy, true);
   assert.equal(shouldDeploy({ built: { kind: 'sample', weekEnding: '2026-10-02' }, deployed: null, force: true }).deploy, false, 'a sample build is never deployed, even forced');
+});
+
+test('rebuild gate: skips when the built week is older than what production already serves', () => {
+  // The October 2026 failure shape, mirrored: production can end up ahead of a
+  // retrying build (e.g. a push build landed first). The week comparison alone
+  // never deploys an older build over a newer one; only the workflow's
+  // explicit force input overrides the comparison.
+  const deployed = { kind: 'live', weekEnding: '2026-10-17' };
+  const r = shouldDeploy({ built: { kind: 'live', weekEnding: '2026-10-10' }, deployed });
+  assert.equal(r.deploy, false);
+  assert.match(r.reason, /already shows CDC week 2026-10-17/);
+  assert.equal(shouldDeploy({ built: { kind: 'live', weekEnding: '2026-10-10' }, deployed, force: true }).deploy, true, 'the explicit force input overrides the comparison');
 });

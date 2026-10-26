@@ -38,7 +38,7 @@ import { threatCard, pathogenTiles, stateChip, signalRows } from '../src/scripts
 import * as seo from './lib/seo.mjs';
 import * as partials from './lib/partials.mjs';
 import { generateSnapshot } from './lib/snapshot.mjs';
-import { resolveSnapshot } from './lib/live-snapshot.mjs';
+import { resolveSnapshot, resolveLivePrerenderMode } from './lib/live-snapshot.mjs';
 import { resolveEpidemicTrend, planEpidemicTrend, publicEpidemicTrend } from './lib/epidemic-trend.mjs';
 import { assetFiles, manifest, icoFromPng, stateOgSvg } from './lib/assets.mjs';
 import { extractCritical } from './lib/critical.mjs';
@@ -402,16 +402,30 @@ async function discoverContentPages(ctx) {
   return pages;
 }
 
+
+/**
+ * Where the resolved LIVE_PRERENDER mode came from — the build log is the
+ * receipt a reviewer checks before trusting a production deployment.
+ */
+function modeSource(env) {
+  if (env.CF_PAGES === '1' && (env.CF_PAGES_BRANCH || '') === 'main') return 'Pages production build entrypoint';
+  if (env.LIVE_PRERENDER) return 'environment variable';
+  return 'default';
+}
+
 // --- Main ---------------------------------------------------------------- //
+
 async function main() {
   console.log('FluTrack build');
   rmSync(dist, { recursive: true, force: true });
   mkdirSync(dist, { recursive: true });
 
-  const { snapshot, live, reason } = await resolveSnapshot({
-    mode: process.env.LIVE_PRERENDER || 'auto',
-    loadSample: loadSampleSnapshot,
-  });
+  // Production git builds always require live data (build/lib/live-snapshot.mjs
+  // resolveLivePrerenderMode): the entrypoint cannot be weakened by a dashboard
+  // variable, and wrangler.toml [env.production.vars] carries the same policy.
+  const mode = resolveLivePrerenderMode({ livePrerender: process.env.LIVE_PRERENDER, cfPages: process.env.CF_PAGES, cfPagesBranch: process.env.CF_PAGES_BRANCH });
+  log(`data policy: LIVE_PRERENDER=${mode} (${modeSource(process.env)})`);
+  const { snapshot, live, reason } = await resolveSnapshot({ mode, loadSample: loadSampleSnapshot });
   if (live) log(`data: LIVE CDC pre-render — ${reason}`);
   else console.warn(`  ! data: SAMPLE fallback — pages will say "Sample data" (${reason})`);
   const ctx = buildContext(snapshot);

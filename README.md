@@ -135,11 +135,22 @@ even when production is current).
    production build during a feed outage then fails and Cloudflare keeps
    serving the last live deploy, instead of replacing it with sample data.
    Leave Preview on the default (`auto`) so branch previews still build when
-   the feed is down. Since `wrangler.toml` carries the project's bindings, it
-   is the source of truth for its variables and the dashboard shows them
-   read-only, so this is a change to `wrangler.toml`. A production-only
-   override must repeat the bindings (Cloudflare treats `vars`, `d1_databases`
-   and `kv_namespaces` as non-inheritable):
+   the feed is down.
+
+   Enforcement is layered, and does not rest on one mechanism:
+
+   - **The build entrypoint decides on its own.** `build/lib/live-snapshot.mjs`
+     (`resolveLivePrerenderMode`) resolves `require` for any git-connected
+     build whose `CF_PAGES_BRANCH` is the production branch — the dashboard
+     cannot weaken it, and no variable has to exist for it to hold.
+   - **`wrangler.toml` carries the same policy.** Since `wrangler.toml` is the
+     project's source of truth (the dashboard shows these variables
+     read-only), a production-only override must repeat the bindings
+     (Cloudflare treats `vars`, `d1_databases` and `kv_namespaces` as
+     non-inheritable). Pages injects these vars into the production build
+     environment as well as the deployed Functions — the 2026-10-19
+     production build log recorded `FEATURE_REPORT=true` straight from the
+     build's `process.env`, and that var exists only in `wrangler.toml`:
 
    ```toml
    [env.production.vars]
@@ -156,8 +167,10 @@ even when production is current).
    id = "91b560ebf86148e0b8c9cc29b1aa48cc"
    ```
 
-   Every build logs the variables it saw (`report form: …; FEATURE_REPORT=…`),
-   so the deploy log confirms the override took. GitHub pauses scheduled workflows
+   Every build logs the variables it saw (`report form: …; FEATURE_REPORT=…`)
+   and the data policy it resolved (`data policy: LIVE_PRERENDER=require
+   (Pages production build entrypoint)`), so the deploy log confirms the
+   enforcement took. GitHub pauses scheduled workflows
 in a repository with no activity for 60 days; re-enable it from the Actions tab
 if that happens.
 
