@@ -42,7 +42,10 @@ export function makeZipLookup(env, request) {
 /** Build-time: group the committed CSV into { "921": { "92101": "06073", … }, … }. */
 export function shardCrosswalk(csvText) {
   const shards = {};
-  for (const line of String(csvText).trim().split('\n').slice(1)) {
+  // \r?\n: a Windows checkout (core.autocrlf) holds this CSV with CRLF line
+  // endings; a plain \n split leaves '\r' on the county FIPS and the strict
+  // check below would silently drop every row, emptying the emitted shards.
+  for (const line of String(csvText).trim().split(/\r?\n/).slice(1)) {
     const [zip5, county] = line.split(',');
     if (!/^\d{5}$/.test(zip5) || !/^\d{5}$/.test(county)) continue;
     const z3 = zip5.slice(0, 3);

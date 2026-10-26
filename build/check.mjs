@@ -94,7 +94,10 @@ if (existsSync(join(dist, 'data/snapshot.json'))) {
   const SAMPLE_BADGE = 'class="badge badge--cached"';
   let pages = 0;
   for (const file of htmlFiles.filter((f) => /[\\/]state[\\/][^\\/]+[\\/]index\.html$/.test(f) || f === join(dist, 'index.html'))) {
-    const rel = file.replace(dist, '');
+    // Normalize separators so the state lookup below matches on Windows too
+    // ("\state\alabama\index.html" never equals "/state/alabama/index.html",
+    // which misread every live page as sample and failed QA on 51 pages).
+    const rel = file.replace(dist, '').split('\\').join('/');
     const html = readFileSync(file, 'utf8');
     pages += 1;
     if (live && html.includes(SAMPLE_BADGE)) errors.push(`${rel}: "Sample data" badge on a page rendered from live CDC data`);
