@@ -179,3 +179,12 @@ test('bad arguments are a usage error (exit 2), never a verdict', () => {
   assert.equal(runCli(['--now']).status, 2);
   assert.equal(runCli(['stray']).status, 2);
 });
+
+test('importing the CLI without an entry argument (eval/REPL) neither throws nor runs the alarm', () => {
+  // pathToFileURL(undefined) throws at import time without the truthiness
+  // guard, taking out every exported function with it.
+  const url = new URL('../build/staleness-alarm.mjs', import.meta.url).href;
+  const run = spawnSync(process.execPath, ['--input-type=module', '-e', `await import(${JSON.stringify(url)})`], { encoding: 'utf8' });
+  assert.equal(run.status, 0, run.stderr);
+  assert.doesNotMatch(run.stdout, /^(PASS|FAIL):/m, 'the alarm must not judge production on a bare import');
+});

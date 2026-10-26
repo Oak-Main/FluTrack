@@ -67,6 +67,31 @@ export function liveSnapshot(live, now = new Date()) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * Resolve the LIVE_PRERENDER mode for THIS build from its environment.
+ *
+ * Two independent layers put `require` on production builds, so neither a
+ * repository regression nor a missing dashboard setting can silently drop a
+ * build back to `auto` and ship sample data:
+ *   1. The Pages production entrypoint: a git-connected build for the
+ *      production branch (CF_PAGES=1, CF_PAGES_BRANCH=main) always requires
+ *      live data. The dashboard cannot weaken this — a stray project variable
+ *      set to "off" on production is a configuration mistake, not a license.
+ *   2. wrangler.toml [env.production.vars] LIVE_PRERENDER="require", which
+ *      Pages injects into the build environment (evidence: the 2026-10-19
+ *      production build log recorded `FEATURE_REPORT=true` — a var that exists
+ *      only in wrangler.toml — straight from build.mjs's process.env).
+ * Everywhere else the explicit environment variable wins, then the `auto`
+ * default — previews keep their sample fallback, local builds stay offline-
+ * friendly. Modes are still validated by resolveSnapshot.
+ */
+export const PAGES_PRODUCTION_BRANCH = 'main';
+
+export function resolveLivePrerenderMode({ livePrerender, cfPages, cfPagesBranch, productionBranch = PAGES_PRODUCTION_BRANCH } = {}) {
+  if (String(cfPages || '') === '1' && String(cfPagesBranch || '') === productionBranch) return 'require';
+  return livePrerender || 'auto';
+}
+
+/**
  * Resolve the snapshot the build renders from.
  * @param {object} opts
  * @param {'auto'|'require'|'off'} [opts.mode]

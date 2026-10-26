@@ -39,10 +39,18 @@ npx wrangler kv namespace create OFFICIAL_CACHE        # put the id in both wran
    FEATURE_REPORT = "true"
    TURNSTILE_SITE_KEY = "0x4AAAA…"
    ```
-   `wrangler.toml` is the Pages project's source of truth, so its `[vars]` are
-   the build's environment too: `build/lib/site.mjs` reads
-   `TURNSTILE_SITE_KEY`, and the dashboard shows these variables read-only.
-   (Committing the key directly to `turnstile.siteKey` in `site.mjs` also works.)
+   `wrangler.toml` is the Pages project's source of truth, so its `[vars]`
+   reach the build environment too, not only the deployed Functions — the
+   2026-10-19 production build log recorded `FEATURE_REPORT=true` straight
+   from build.mjs's `process.env`, and that var exists only in `wrangler.toml`.
+   `build/lib/site.mjs` reads `TURNSTILE_SITE_KEY` this way, and the dashboard
+   shows these variables read-only. (Committing the key directly to
+   `turnstile.siteKey` in `site.mjs` also works.) Note the distinction this
+   relies on: Pages project variables set in the dashboard cover both build
+   and runtime, while `[env.production.vars]` in `wrangler.toml` scopes a
+   value to production deployments. LIVE_PRERENDER additionally cannot rest on
+   either alone — the build resolves `require` for production-branch builds in
+   code (`resolveLivePrerenderMode` in `build/lib/live-snapshot.mjs`).
 4. Check the deploy log line `report form: ON (Turnstile site key set)`.
 5. Verify: the home page shows the report form (not "opens soon"); a report from
    a phone returns the result card with "Thanks — your report was counted."

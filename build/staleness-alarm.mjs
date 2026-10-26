@@ -144,7 +144,8 @@ async function main(argv) {
 
 // pathToFileURL, not a string splice: `file://${argv[1]}` never matches on
 // Windows (backslashes, drive letters), where the CLI would then exit 0
-// without ever running.
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+// without ever running. The truthiness guard first: argv[1] is absent for
+// eval/REPL-style imports, and pathToFileURL(undefined) throws.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   await main(process.argv.slice(2));
 }
