@@ -156,3 +156,14 @@ test('rebuild gate: deploys a newer CDC week, skips the same week, never deploys
   assert.equal(shouldDeploy({ built, deployed: { kind: 'live', weekEnding: '2026-10-03' }, force: true }).deploy, true);
   assert.equal(shouldDeploy({ built: { kind: 'sample', weekEnding: '2026-10-02' }, deployed: null, force: true }).deploy, false, 'a sample build is never deployed, even forced');
 });
+
+test('rebuild gate: skips when the built week is older than what production already serves', () => {
+  // The October 2026 failure shape, mirrored: production can end up ahead of a
+  // retrying build (e.g. a push build landed first). An older live build must
+  // not be deployed over a newer one, even by force.
+  const deployed = { kind: 'live', weekEnding: '2026-10-17' };
+  const r = shouldDeploy({ built: { kind: 'live', weekEnding: '2026-10-10' }, deployed });
+  assert.equal(r.deploy, false);
+  assert.match(r.reason, /already shows CDC week 2026-10-17/);
+  assert.equal(shouldDeploy({ built: { kind: 'live', weekEnding: '2026-10-10' }, deployed, force: true }).deploy, true, 'force is the only way to redeploy an older week');
+});
