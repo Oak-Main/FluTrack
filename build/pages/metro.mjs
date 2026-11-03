@@ -34,6 +34,12 @@ export const metros = [
     stateAbbr: 'CA',
     context: `California Department of Public Health (cdph.ca.gov), county health departments and CDC wastewater surveillance provide additional official reports. The reading below is calculated from California state surveillance, not independent Bay Area measurements. Sampling coverage varies by sewershed, and a local change cannot establish a statewide or national trend.`,
   },
+  {
+    slug: 'new-york-city',
+    name: 'New York City',
+    stateAbbr: 'NY',
+    context: `The New York City Department of Health and Mental Hygiene (nyc.gov) publishes a weekly respiratory-illness report covering flu, RSV and COVID-19, updated Thursdays. The New York State Department of Health's Flu Tracker (nyshc.health.ny.gov) shows weekly flu activity by county, and CDC wastewater and emergency-department surveillance include monitoring locations in New York. The reading below is calculated from New York state surveillance; activity in the five boroughs can differ from the state reading, and FluTrack has no independently measured New York City index.`,
+  },
 ];
 
 export function metroPage(ctx, metro) {
