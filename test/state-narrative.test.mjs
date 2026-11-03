@@ -41,7 +41,7 @@ test('fastest-rising selection uses up and compares the same measurement only', 
 
 test('undefined relative growth is not ranked and two capped changes compare actual evidence', () => {
   const zero = render(signals([0, 0, 0, 0.1], { pathogens: { rsv: { edPercentSeries: [0, 0, 0, 0.1] } } }));
-  assert.match(zero, /increased from zero; percentage change is undefined/);
+  assert.match(zero, /increased from zero; no percentage change can be calculated from a zero baseline/);
   assert.doesNotMatch(zero, /\+100%|Largest relative increase/);
   const capped = render(signals([1, 1, 1, 1.2], { pathogens: {
     influenza: { edPercentSeries: [0, 0, 0.1, 0.2] },
