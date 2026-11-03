@@ -143,7 +143,7 @@ test('selection announcements carry sample, historical, missing and trend eviden
   assert.match(selectionAnnouncement(state, computeModel(short.states.MD, { now })), /not enough comparable observations to determine a trend/);
   const zero = fixture('live', [0, 0, 0, 0.1]);
   const zeroText = selectionAnnouncement(state, computeModel(zero.states.MD, { now }));
-  assert.match(zeroText, /increased from zero; percentage change is undefined/);
+  assert.match(zeroText, /increased from zero; no percentage change can be calculated from a zero baseline/);
   assert.doesNotMatch(zeroText, /\+100%/);
   const capped = fixture('live', [0, 0, 0.1, 0.2]);
   assert.match(selectionAnnouncement(state, computeModel(capped.states.MD, { now })), /\+200% or more \(display capped\)/);

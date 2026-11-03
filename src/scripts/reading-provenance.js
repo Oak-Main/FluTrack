@@ -78,7 +78,7 @@ export function relativeTrendChange(trend = {}) {
 
 /** Keep capped model percentages distinct from the observed comparison. */
 export function trendChangeText(trend = {}) {
-  if (trend.zeroBaseline) return `${trend.direction === 'up' ? 'increased' : 'unchanged'} from zero; percentage change is undefined`;
+  if (trend.zeroBaseline) return `${trend.direction === 'up' ? 'increased' : 'unchanged'} from zero; no percentage change can be calculated from a zero baseline`;
   if (trend.changePctCapped) {
     return trend.changePct >= 0
       ? `${formatChange(trend.changePct)} or more (display capped)`

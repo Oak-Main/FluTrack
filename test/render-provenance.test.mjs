@@ -26,11 +26,11 @@ test('up, down and flat chips identify the comparison and selected measurement',
 test('zero baselines never publish invented percentages and capped changes are explicitly bounded', () => {
   const zero = computeModel(bundle([0, 0, 0, 0.1]), context);
   const zeroHtml = trendChip(zero.trend) + pathogenTiles(zero);
-  assert.match(zeroHtml, /increased from zero; percentage change is undefined/);
+  assert.match(zeroHtml, /increased from zero; no percentage change can be calculated from a zero baseline/);
   assert.match(zeroHtml, /trend--up/);
   assert.doesNotMatch(zeroHtml, /\+100%/);
   const unchanged = trendChip(computeModel(bundle([0, 0]), context).trend);
-  assert.match(unchanged, /unchanged from zero; percentage change is undefined/);
+  assert.match(unchanged, /unchanged from zero; no percentage change can be calculated from a zero baseline/);
   assert.doesNotMatch(unchanged, /\+0%|no change%/);
   const capped = trendChip(computeModel(bundle([0, 0, 0.1, 0.2]), context).trend);
   assert.match(capped, /Rising \+200% or more \(display capped\)/);
