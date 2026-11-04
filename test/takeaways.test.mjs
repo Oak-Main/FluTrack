@@ -83,12 +83,20 @@ test('Georgia: states separate wastewater readings without ranking pathogen prev
   assert.match(all, /Georgia has the highest available index level among the 2 other states with usable readings for the same observation period in Georgia’s HHS region — 2 of 2 compared states are lower\./);
 });
 
-test('zero-baseline and capped comparisons are qualified without invented percentage headlines', () => {
-  const zero = { ...MD, edCombinedSeries: [0, 0, 0, 0.1], pathogens: { influenza: { edPercentSeries: [0, 0, 0, 0.1] } } };
-  const zeroText = texts(weeklyTakeaways(find('GA'), computeModel(zero), zero, { live: true }));
-  assert.match(zeroText, /share of emergency-department visits increased from zero compared with the mean of up to three prior observations/);
-  assert.match(zeroText, /relative percentage change is undefined with a zero baseline/);
-  assert.doesNotMatch(zeroText, /\+100%/);
+test('takeaways distinguish an increase from zero from a reading that stayed at zero', () => {
+  const zero = { ...MD, edCombinedSeries: [0, 0, 0, 0.1], pathogens: { influenza: { edPercentSeries: [0, 0] } } };
+  const items = weeklyTakeaways(find('MD'), computeModel(zero), zero, { live: true });
+  const overall = items.find((item) => item.lead === 'Overall').text;
+  const flu = items.find((item) => item.lead === 'Flu').text;
+  assert.match(overall, /share of emergency-department visits increased from zero compared with the mean of up to three prior observations/);
+  assert.match(flu, /share of emergency-department visits was unchanged from zero compared with the mean of up to three prior observations/);
+  for (const text of [overall, flu]) {
+    assert.match(text, /no percentage change can be calculated from a zero baseline/i);
+    assert.doesNotMatch(text, /\b(?:undefined|NaN|Infinity)\b|[+-]\d+(?:\.\d+)?%/i);
+  }
+});
+
+test('capped comparisons are qualified without invented percentage headlines', () => {
   const capped = { ...MD, edCombinedSeries: [0, 0, 0.1, 0.2], pathogens: { influenza: { edPercentSeries: [0, 0, 0.1, 0.2] } } };
   const cappedText = texts(weeklyTakeaways(find('VT'), computeModel(capped), capped, { live: true }));
   assert.match(cappedText, /relative percentage change exceeds the model cap; the capped value is not the actual comparison/);
