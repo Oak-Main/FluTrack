@@ -45,6 +45,7 @@ function initNav() {
   const setOpen = (open) => {
     nav.classList.toggle('is-open', open);
     toggle.setAttribute('aria-expanded', String(open));
+    if (open) nav.querySelector('a[href]')?.focus();
   };
   toggle.addEventListener('click', () => setOpen(!nav.classList.contains('is-open')));
   document.addEventListener('click', (event) => {

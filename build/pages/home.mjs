@@ -79,9 +79,10 @@ export default function home(ctx) {
         <p class="text-secondary">Tap or select a state for its full report.</p>
       </div>
       ${epidemicTrendHomeLine(ctx.epidemicTrend)}
+      <a class="skip-link" href="#after-state-map">Skip the state map</a>
       <div data-region="us-map">${usMap(mapEntries, { selected: '' })}</div>
       <div style="margin-top: var(--space-xl)">
-        <a class="btn btn--secondary" href="/states/" data-region="state-link">Full state report</a>
+        <a class="btn btn--secondary" id="after-state-map" href="/states/" data-region="state-link">Full state report</a>
       </div>
     </div>
   </section>
