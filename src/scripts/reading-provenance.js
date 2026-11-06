@@ -68,6 +68,7 @@ export function presentationModel(model = {}, context = {}) {
 }
 
 export const TREND_COMPARISON = 'latest observation compared with the mean of up to three prior observations';
+export const ZERO_BASELINE_EXPLANATION = 'no percentage change can be calculated from a zero baseline';
 
 /** A zero baseline has no relative percentage, including zero-to-zero. */
 export function relativeTrendChange(trend = {}) {
@@ -78,7 +79,7 @@ export function relativeTrendChange(trend = {}) {
 
 /** Keep capped model percentages distinct from the observed comparison. */
 export function trendChangeText(trend = {}) {
-  if (trend.zeroBaseline) return `${trend.direction === 'up' ? 'increased' : 'unchanged'} from zero; no percentage change can be calculated from a zero baseline`;
+  if (trend.zeroBaseline) return `${trend.direction === 'up' ? 'increased' : 'unchanged'} from zero; ${ZERO_BASELINE_EXPLANATION}`;
   if (trend.changePctCapped) {
     return trend.changePct >= 0
       ? `${formatChange(trend.changePct)} or more (display capped)`

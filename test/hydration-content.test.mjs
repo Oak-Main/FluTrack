@@ -100,6 +100,32 @@ test('static and hydrated state summaries, cards, source evidence, metadata and 
   } finally { globalThis.document = previousDocument; }
 });
 
+test('live refresh replaces sample takeaways with the same zero-baseline explanation as the built state page', () => {
+  const previousDocument = globalThis.document;
+  try {
+    const sample = fixture('sample');
+    const doc = documentFor(pageFor(sample));
+    globalThis.document = doc;
+    const store = { signals: new Map(), weekEnding: '', provenance: {} };
+    ingestSnapshot(store, sample);
+    const takeaways = doc.regions.get('takeaways');
+    assert.equal(takeaways.innerHTML, '');
+
+    for (const series of [[0, 0, 0, 0.1], [0, 0]]) {
+      const live = fixture('live', series);
+      const page = pageFor(live);
+      const built = regionContent(page.body, 'takeaways');
+      assert.match(built, /no percentage change can be calculated from a zero baseline/i);
+      assert.doesNotMatch(page.body, /\bundefined\b/i);
+
+      ingestLive(store, { ...live, signalsByAbbr: new Map(Object.entries(live.states)) });
+      render(store, state.abbr);
+      assert.equal(takeaways.innerHTML, built);
+      for (const region of doc.regions.values()) assert.doesNotMatch(region.textContent, /\bundefined\b/i);
+    }
+  } finally { globalThis.document = previousDocument; }
+});
+
 test('refreshing an unavailable state removes older/sample claims rather than borrowing a national level', () => {
   const previousDocument = globalThis.document;
   try {

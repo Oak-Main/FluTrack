@@ -18,7 +18,7 @@
 
 import { escapeHtml, formatDate, formatPct } from './util.js';
 import { BREAKPOINTS, SEVERITY_LABELS, bucketize } from './threat-index.js';
-import { MEASUREMENT_NAMES, metricAvailable, observationWeek, readingStatus, resolveProvenance } from './reading-provenance.js';
+import { MEASUREMENT_NAMES, ZERO_BASELINE_EXPLANATION, metricAvailable, observationWeek, readingStatus, resolveProvenance } from './reading-provenance.js';
 
 const VIRUS_NAMES = { influenza: 'flu', covid: 'COVID-19', rsv: 'RSV' };
 const CONTRIBUTOR_NAMES = {
@@ -55,7 +55,10 @@ const trendSentence = (level, trend) => {
   const m = movement(level, trend);
   const source = MEASUREMENT_NAMES[trend?.source] || 'the selected surveillance signal';
   const subject = `${source[0].toUpperCase()}${source.slice(1)}`;
-  if (m && trend.zeroBaseline) return ` ${subject} ${trend.direction === 'up' ? 'increased' : 'was unchanged'} from zero compared with the mean of up to three prior observations. A relative percentage change is undefined with a zero baseline.`;
+  if (m && trend.zeroBaseline) {
+    const change = trend.direction === 'up' ? 'increased' : 'was unchanged';
+    return ` ${subject} ${change} from zero compared with the mean of up to three prior observations, so ${ZERO_BASELINE_EXPLANATION}.`;
+  }
   return m ? ` ${subject} was ${m} compared with the mean of up to three prior observations.${trend.changePctCapped ? ' The relative percentage change exceeds the model cap; the capped value is not the actual comparison.' : ''}` : ' There is not enough history to determine a trend.';
 };
 
